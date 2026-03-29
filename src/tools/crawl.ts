@@ -1,44 +1,65 @@
 import { fetchWithRetry, extractMainContent, extractTitle, normalizeUrl, isContentLink } from "../utils/index.js";
 import type { CrawlParams } from "./types.js";
 
+const CRAWL_CONCURRENCY = 3;
+
+interface CrawlResult {
+  url: string;
+  title: string;
+  text: string;
+  depth: number;
+  wordCount: number;
+}
+
+async function fetchPage(url: string): Promise<{ html: string; url: string } | null> {
+  try {
+    const response = await fetchWithRetry(url, { timeout: 15000, maxRedirects: 3 });
+    if (typeof response.data !== "string") return null;
+    return { html: response.data, url };
+  } catch {
+    return null;
+  }
+}
+
 export async function novadaCrawl(params: CrawlParams): Promise<string> {
   const maxPages = Math.min(params.max_pages || 5, 20);
   const visited = new Set<string>();
   const queue: { url: string; depth: number }[] = [
     { url: params.url, depth: 0 },
   ];
-  const results: {
-    url: string;
-    title: string;
-    text: string;
-    depth: number;
-    wordCount: number;
-  }[] = [];
+  const results: CrawlResult[] = [];
   const baseHostname = new URL(params.url).hostname.replace(/^www\./, "");
 
   while (queue.length > 0 && results.length < maxPages) {
-    const item = params.strategy === "dfs" ? queue.pop()! : queue.shift()!;
+    // Take up to CRAWL_CONCURRENCY items from queue
+    const batch: { url: string; depth: number }[] = [];
+    while (batch.length < CRAWL_CONCURRENCY && queue.length > 0 && results.length + batch.length < maxPages) {
+      const item = params.strategy === "dfs" ? queue.pop()! : queue.shift()!;
+      const normalizedUrl = normalizeUrl(item.url);
+      if (visited.has(normalizedUrl)) continue;
+      visited.add(normalizedUrl);
+      batch.push(item);
+    }
 
-    const normalizedUrl = normalizeUrl(item.url);
-    if (visited.has(normalizedUrl)) continue;
-    visited.add(normalizedUrl);
+    if (batch.length === 0) break;
 
-    try {
-      const response = await fetchWithRetry(item.url, { timeout: 15000, maxRedirects: 3 });
-      const html = response.data;
-      if (typeof html !== "string") continue;
+    // Fetch pages concurrently
+    const pages = await Promise.all(batch.map((item) => fetchPage(item.url)));
 
-      const title = extractTitle(html);
-      const text = extractMainContent(html).slice(0, 3000);
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      if (!page) continue;
+
+      const title = extractTitle(page.html);
+      const text = extractMainContent(page.html).slice(0, 3000);
       const wordCount = text.split(/\s+/).filter(Boolean).length;
 
-      // Skip near-empty pages
       if (wordCount < 20) continue;
 
-      results.push({ url: item.url, title, text, depth: item.depth, wordCount });
+      results.push({ url: batch[i].url, title, text, depth: batch[i].depth, wordCount });
 
       // Discover same-domain content links
-      const linkMatches = html.matchAll(/href=["'](https?:\/\/[^"'#]+)["']/gi);
+      const linkMatches = page.html.matchAll(/href=["'](https?:\/\/[^"'#]+)["']/gi);
       for (const match of linkMatches) {
         try {
           const linkUrl = new URL(match[1]);
@@ -49,14 +70,12 @@ export async function novadaCrawl(params: CrawlParams): Promise<string> {
             !visited.has(normalizedLink) &&
             isContentLink(linkUrl.href)
           ) {
-            queue.push({ url: linkUrl.href, depth: item.depth + 1 });
+            queue.push({ url: linkUrl.href, depth: batch[i].depth + 1 });
           }
         } catch {
           // Invalid URL, skip
         }
       }
-    } catch {
-      // Failed to fetch, skip this page
     }
   }
 

@@ -41,6 +41,22 @@ export interface NovadaApiResponse {
   organic_results?: NovadaSearchResult[];
 }
 
+/** Structured error codes for agent decision-making */
+export enum NovadaErrorCode {
+  INVALID_API_KEY = "INVALID_API_KEY",
+  RATE_LIMITED = "RATE_LIMITED",
+  URL_UNREACHABLE = "URL_UNREACHABLE",
+  API_DOWN = "API_DOWN",
+  INVALID_PARAMS = "INVALID_PARAMS",
+  UNKNOWN = "UNKNOWN",
+}
+
+export interface NovadaError {
+  code: NovadaErrorCode;
+  message: string;
+  retryable: boolean;
+}
+
 /** Runtime validation — replaces `as unknown as XParams` double casts */
 
 export function validateSearchParams(args: Record<string, unknown> | undefined): SearchParams {

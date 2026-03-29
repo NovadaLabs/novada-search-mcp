@@ -30,7 +30,7 @@ const TOOLS = [
   {
     name: "novada_search",
     description:
-      "Search the web using Novada's Scraper API. Returns structured search results from Google, Bing, and other engines. Use for finding current information, news, facts, or data.",
+      "Search the web using Novada's Scraper API (proxied through Novada's infrastructure). Best for: factual queries, news, current events, finding specific pages. Not ideal for: complex questions needing multiple perspectives (use novada_research instead), or reading a specific URL's content (use novada_extract instead).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -51,7 +51,7 @@ const TOOLS = [
   {
     name: "novada_extract",
     description:
-      "Extract content from a single URL. Returns title, description, main text, and meaningful links using readability-based extraction. Note: works best with server-rendered pages; JavaScript-heavy SPAs may return incomplete content.",
+      "Extract content from a single URL. Returns title, description, main text, and meaningful links. Note: fetches static HTML directly (not through Novada's proxy infrastructure). Works best with server-rendered pages. Not ideal for: JavaScript-heavy SPAs, pages behind login walls, or sites with aggressive anti-bot protection (these may return incomplete content or be blocked).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -64,7 +64,7 @@ const TOOLS = [
   {
     name: "novada_crawl",
     description:
-      "Crawl a website starting from a seed URL. Discovers and extracts content from multiple same-domain pages. Reports why it stops early if max_pages isn't reached. Note: static HTML crawling — JavaScript-rendered pages may return incomplete content.",
+      "Crawl a website starting from a seed URL (up to 3 pages concurrently). Discovers and extracts content from multiple same-domain pages. Note: fetches static HTML directly (not through Novada's proxy). Works best with server-rendered sites. Not ideal for: JavaScript SPAs, sites behind Cloudflare, or pages requiring authentication.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -78,7 +78,7 @@ const TOOLS = [
   {
     name: "novada_research",
     description:
-      "Multi-step web research. Generates diverse search queries from different angles, executes them in parallel, deduplicates sources, and returns a comprehensive report. Best for complex questions needing multiple perspectives.",
+      "Multi-angle search aggregation (powered by Novada's Scraper API). Generates diverse queries, executes them in parallel via Novada, deduplicates sources, and returns a structured report with citations. Best for: complex questions needing multiple perspectives, competitive analysis, topic overviews. Note: aggregates search snippets — does not read/extract the full content of found URLs. For deeper analysis, follow up with novada_extract on specific sources.",
     inputSchema: {
       type: "object" as const,
       properties: {

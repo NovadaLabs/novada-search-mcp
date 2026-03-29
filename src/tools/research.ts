@@ -1,6 +1,6 @@
 import { fetchWithRetry, USER_AGENT, normalizeUrl } from "../utils/index.js";
 import { SCRAPER_API_BASE } from "../config.js";
-import type { ResearchParams } from "./types.js";
+import type { ResearchParams, NovadaApiResponse, NovadaSearchResult } from "./types.js";
 
 export async function novadaResearch(params: ResearchParams, apiKey: string): Promise<string> {
   if (params.question.length < 5) {
@@ -12,7 +12,7 @@ export async function novadaResearch(params: ResearchParams, apiKey: string): Pr
 
   // Execute all searches in parallel
   const allResults = await Promise.all(
-    queries.map(async (query): Promise<{ query: string; results: any[] }> => {
+    queries.map(async (query): Promise<{ query: string; results: NovadaSearchResult[] }> => {
       try {
         const searchParams = new URLSearchParams({
           q: query,
@@ -32,8 +32,8 @@ export async function novadaResearch(params: ResearchParams, apiKey: string): Pr
           }
         );
 
-        const data = response.data;
-        const results = data.data?.organic_results || data.organic_results || [];
+        const data: NovadaApiResponse = response.data;
+        const results: NovadaSearchResult[] = data.data?.organic_results || data.organic_results || [];
         return { query, results };
       } catch {
         return { query, results: [] };
