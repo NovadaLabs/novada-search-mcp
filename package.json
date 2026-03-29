@@ -1,0 +1,41 @@
+{
+  "name": "novada-mcp",
+  "version": "0.1.0",
+  "description": "MCP Server for Novada — real-time web data API for AI agents. Search, extract, crawl, and research the web.",
+  "type": "module",
+  "bin": {
+    "novada-mcp": "build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "novada",
+    "web-scraping",
+    "search",
+    "ai-agents",
+    "model-context-protocol"
+  ],
+  "author": "Novada <support@novada.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Goldentrii/novada-mcp.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  }
+}
