@@ -315,7 +315,7 @@ Agent: Chunks content, generates embeddings, stores in vector DB
 | Multi-step research | Yes | Yes | No | No |
 | Proxy infrastructure | 100M+ IPs, 195 countries | No | No | No |
 | Anti-bot bypass | Built-in | No | Partial | No |
-| Browser rendering | CDP-based | No | Yes | No |
+| Browser rendering | No (static HTML) | No | Yes | No |
 | Localized results | Country + language | Country | No | Country |
 | Free tier | Yes | Yes | Yes | Yes |
 
@@ -325,7 +325,7 @@ Agent: Chunks content, generates embeddings, stores in vector DB
 - **100M+ proxy IPs across 195 countries** — Access any website without blocks, CAPTCHAs, or rate limits. Your agent never gets a 403.
 - **Built for agents, not humans** — MCP-native from day one. Structured responses, no HTML parsing, no browser automation code needed.
 - **Research mode** — Your agent asks one question, Novada performs 3-8 searches, deduplicates sources, and returns a synthesized report. No manual search loops.
-- **99.99% uptime** — Production-grade infrastructure trusted by thousands of global businesses and developers.
+- **99.99% uptime on Novada's API** — Novada's search and proxy infrastructure has 99.99% uptime SLA. The MCP server itself runs locally on your machine.
 - **Privacy-first** — Novada does not store or log your search queries or extracted content. Your agent's data stays yours.
 - **Active development** — New tools and capabilities added regularly. Built by the team behind [novada.com](https://www.novada.com/).
 

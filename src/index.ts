@@ -6,7 +6,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -126,9 +126,9 @@ function extractMainContent(html: string): string {
 /** HTTP request with exponential backoff retry */
 async function fetchWithRetry(
   url: string,
-  options: Record<string, unknown> = {},
+  options: Partial<AxiosRequestConfig> = {},
   retries: number = MAX_RETRIES
-): Promise<any> {
+): Promise<AxiosResponse> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await axios.get(url, {
@@ -136,7 +136,7 @@ async function fetchWithRetry(
         timeout: 30000,
         maxRedirects: 5,
         ...options,
-      } as any);
+      });
     } catch (error) {
       if (attempt === retries) throw error;
       const isRetryable =
@@ -149,6 +149,7 @@ async function fetchWithRetry(
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
+  throw new Error(`Failed after ${retries + 1} attempts: ${url}`);
 }
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
@@ -268,15 +269,35 @@ const TOOLS = [
   },
 ];
 
-// ─── Tool Implementations ────────────────────────────────────────────────────
+// ─── Tool Parameter Types ────────────────────────────────────────────────────
 
-async function novadaSearch(params: {
+interface SearchParams {
   query: string;
   engine?: string;
   num?: number;
   country?: string;
   language?: string;
-}): Promise<string> {
+}
+
+interface ExtractParams {
+  url: string;
+  format?: string;
+}
+
+interface CrawlParams {
+  url: string;
+  max_pages?: number;
+  strategy?: string;
+}
+
+interface ResearchParams {
+  question: string;
+  depth?: string;
+}
+
+// ─── Tool Implementations ────────────────────────────────────────────────────
+
+async function novadaSearch(params: SearchParams): Promise<string> {
   if (!API_KEY) {
     throw new Error(
       "NOVADA_API_KEY is not set. Get your API key at https://www.novada.com and set it as an environment variable."
@@ -358,10 +379,7 @@ async function novadaSearch(params: {
     .join("\n\n");
 }
 
-async function novadaExtract(params: {
-  url: string;
-  format?: string;
-}): Promise<string> {
+async function novadaExtract(params: ExtractParams): Promise<string> {
   if (!API_KEY) {
     throw new Error(
       "NOVADA_API_KEY is not set. Get your API key at https://www.novada.com"
@@ -396,6 +414,19 @@ async function novadaExtract(params: {
     ...new Set(allLinks.filter((href) => isContentLink(href, pageHostname))),
   ].slice(0, 20);
 
+  // Plain text: strip markdown formatting
+  if (params.format === "text") {
+    const plainContent = mainContent
+      .replace(/^#{1,6}\s+/gm, "")  // remove markdown headers
+      .replace(/^\- /gm, "  * ")     // convert list markers
+      .replace(/\*\*([^*]+)\*\*/g, "$1"); // remove bold
+    const linksText = meaningfulLinks.length > 0
+      ? `\nLinks:\n${meaningfulLinks.map((l) => `  ${l}`).join("\n")}`
+      : "";
+    return `${title}\n${description ? description + "\n" : ""}\n${plainContent}${linksText}`;
+  }
+
+  // Markdown (default)
   return [
     `# ${title}`,
     description ? `\n> ${description}` : "",
@@ -408,11 +439,7 @@ async function novadaExtract(params: {
     .join("\n");
 }
 
-async function novadaCrawl(params: {
-  url: string;
-  max_pages?: number;
-  strategy?: string;
-}): Promise<string> {
+async function novadaCrawl(params: CrawlParams): Promise<string> {
   if (!API_KEY) {
     throw new Error(
       "NOVADA_API_KEY is not set. Get your API key at https://www.novada.com"
@@ -489,10 +516,17 @@ async function novadaCrawl(params: {
   }
 
   const totalWords = results.reduce((sum, r) => sum + r.wordCount, 0);
+  const stoppedEarly = results.length < maxPages;
+  const stopReason = stoppedEarly
+    ? queue.length === 0
+      ? "No more same-domain links to follow."
+      : "Remaining links were filtered (assets, auth pages, or already visited)."
+    : "";
 
   return [
     `# Crawl Results for ${params.url}`,
-    `\nPages crawled: ${results.length}/${maxPages} | Strategy: ${params.strategy || "bfs"} | Total words: ${totalWords}\n`,
+    `\nPages crawled: ${results.length}/${maxPages} | Strategy: ${params.strategy || "bfs"} | Total words: ${totalWords}`,
+    stoppedEarly ? `\n*Stopped early: ${stopReason}*\n` : "\n",
     ...results.map(
       (r) =>
         `## ${r.title}\n**URL:** ${r.url} | **Depth:** ${r.depth} | **Words:** ${r.wordCount}\n\n${r.text}\n`
@@ -500,10 +534,7 @@ async function novadaCrawl(params: {
   ].join("\n");
 }
 
-async function novadaResearch(params: {
-  question: string;
-  depth?: string;
-}): Promise<string> {
+async function novadaResearch(params: ResearchParams): Promise<string> {
   if (!API_KEY) {
     throw new Error(
       "NOVADA_API_KEY is not set. Get your API key at https://www.novada.com"
@@ -516,36 +547,38 @@ async function novadaResearch(params: {
 
   const isDeep = params.depth === "deep";
   const queries = generateSearchQueries(params.question, isDeep);
-  const allResults: { query: string; results: any[] }[] = [];
 
-  for (const query of queries) {
-    try {
-      const searchParams = new URLSearchParams({
-        q: query,
-        api_key: API_KEY,
-        engine: "google",
-        num: "5",
-      });
+  // Execute searches in parallel (max 3 concurrent)
+  const allResults = await Promise.all(
+    queries.map(async (query): Promise<{ query: string; results: any[] }> => {
+      try {
+        const searchParams = new URLSearchParams({
+          q: query,
+          api_key: API_KEY,
+          engine: "google",
+          num: "5",
+        });
 
-      const response = await fetchWithRetry(
-        `${SCRAPER_API_BASE}/search?${searchParams.toString()}`,
-        {
-          headers: {
-            "User-Agent": USER_AGENT,
-            Origin: "https://www.novada.com",
-            Referer: "https://www.novada.com/",
-          },
-        }
-      );
+        const response = await fetchWithRetry(
+          `${SCRAPER_API_BASE}/search?${searchParams.toString()}`,
+          {
+            headers: {
+              "User-Agent": USER_AGENT,
+              Origin: "https://www.novada.com",
+              Referer: "https://www.novada.com/",
+            },
+          }
+        );
 
-      const data = response.data;
-      const results =
-        data.data?.organic_results || data.organic_results || [];
-      allResults.push({ query, results });
-    } catch {
-      allResults.push({ query, results: [] });
-    }
-  }
+        const data = response.data;
+        const results =
+          data.data?.organic_results || data.organic_results || [];
+        return { query, results };
+      } catch {
+        return { query, results: [] };
+      }
+    })
+  );
 
   const totalResults = allResults.reduce(
     (sum, r) => sum + r.results.length,
@@ -651,16 +684,16 @@ class NovadaMCPServer {
 
         switch (name) {
           case "novada_search":
-            result = await novadaSearch(args as any);
+            result = await novadaSearch(args as unknown as SearchParams);
             break;
           case "novada_extract":
-            result = await novadaExtract(args as any);
+            result = await novadaExtract(args as unknown as ExtractParams);
             break;
           case "novada_crawl":
-            result = await novadaCrawl(args as any);
+            result = await novadaCrawl(args as unknown as CrawlParams);
             break;
           case "novada_research":
-            result = await novadaResearch(args as any);
+            result = await novadaResearch(args as unknown as ResearchParams);
             break;
           default:
             return {
