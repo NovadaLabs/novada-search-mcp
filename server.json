@@ -6,7 +6,7 @@
     "url": "https://github.com/Goldentrii/novada-mcp",
     "source": "github"
   },
-  "version": "0.6.7",
+  "version": "0.6.8",
   "tools": [
     {
       "name": "novada_search",
@@ -35,7 +35,7 @@
     {
       "registryType": "npm",
       "identifier": "novada-mcp",
-      "version": "0.6.7",
+      "version": "0.6.8",
       "transport": {
         "type": "stdio"
       },
