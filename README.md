@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="https://lobehub.com/mcp/goldentrii-novada-mcp"><img src="https://lobehub.com/badge--primary.svg" alt="LobeHub MCP — Verified"></a>
+  <a href="https://lobehub.com/mcp/goldentrii-novada-mcp"><img src="https://lobehub.com/badge/mcp-full/goldentrii-novada-mcp?theme=light" alt="MCP Badge"></a>
 </p>
 
 ---
