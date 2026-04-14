@@ -23,6 +23,10 @@
   <a href="https://github.com/Goldentrii/novada-mcp"><img src="https://img.shields.io/github/stars/Goldentrii/novada-mcp?style=social" alt="stars"></a>
 </p>
 
+<p align="center">
+  <a href="https://lobehub.com/mcp/goldentrii-novada-mcp"><img src="https://lobehub.com/badge--primary.svg" alt="LobeHub MCP — Verified"></a>
+</p>
+
 ---
 
 <p align="center">

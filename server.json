@@ -29,6 +29,37 @@
       "description": "Multi-step research: generates 3-10 parallel search queries, deduplicates up to 15 unique sources, returns cited report. depth=auto|quick|deep|comprehensive. Optional focus param narrows sub-query generation."
     }
   ],
+  "prompts": [
+    {
+      "name": "research_topic",
+      "description": "Deep multi-source research on any topic with optional country and focus constraints"
+    },
+    {
+      "name": "extract_and_summarize",
+      "description": "Extract content from one or more URLs and prepare a focused summary"
+    },
+    {
+      "name": "site_audit",
+      "description": "Map a website structure then extract and summarize key sections"
+    }
+  ],
+  "resources": [
+    {
+      "uri": "novada://engines",
+      "name": "Supported Search Engines",
+      "description": "List of search engines available in novada_search with characteristics and recommended use cases"
+    },
+    {
+      "uri": "novada://countries",
+      "name": "Supported Country Codes",
+      "description": "Country codes for geo-targeted search in novada_search. 195 countries supported."
+    },
+    {
+      "uri": "novada://guide",
+      "name": "Agent Tool Selection Guide",
+      "description": "Decision tree and workflow patterns for choosing between novada_search, extract, crawl, map, and research"
+    }
+  ],
   "categories": ["web-search", "web-scraping", "research", "data-extraction"],
   "topics": ["search", "extract", "crawl", "map", "research", "proxy", "anti-bot", "geo-targeting", "rag", "ai-agents"],
   "packages": [
