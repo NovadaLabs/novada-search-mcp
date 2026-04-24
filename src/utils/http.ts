@@ -37,43 +37,51 @@ export async function fetchWithRetry(
 }
 
 /**
- * Fetch a URL through Novada Scraper API (generic web fetch, no JS rendering).
- * Endpoint: scraper.novada.com — uses NOVADA_API_KEY.
+ * Fetch a URL through Novada Web Unblocker (no JS rendering).
+ * Uses NOVADA_WEB_UNBLOCKER_KEY when available; falls back to direct fetch.
+ *
+ * Note: The Scraper API (scraper.novada.com) is a task-based async API and does
+ * not expose a synchronous URL-fetch endpoint. Web Unblocker is the correct product
+ * for synchronous proxy-backed page fetching.
  */
-// Session-level circuit breaker: skip Scraper API proxy once we know it's unavailable
-let scraperProxyAvailable: boolean | null = null;
-
 export async function fetchViaProxy(
   url: string,
-  apiKey: string | undefined,
+  _apiKey: string | undefined,
   options: Partial<AxiosRequestConfig> = {}
 ): Promise<AxiosResponse> {
-  if (apiKey && scraperProxyAvailable !== false) {
-    const proxyParams = new URLSearchParams({ api_key: apiKey, url });
-    const proxyUrl = `${SCRAPER_API_BASE}?${proxyParams.toString()}`;
+  const unblockerKey = process.env.NOVADA_WEB_UNBLOCKER_KEY;
 
-    if (scraperProxyAvailable === true) {
-      // Known-good: use proxy directly
-      return fetchWithRetry(proxyUrl, { headers: { "User-Agent": USER_AGENT }, timeout: 45000, ...options });
-    }
-
-    // Unknown state: race proxy vs direct fetch — take the first successful response
-    const proxyFetch = fetchWithRetry(proxyUrl, { headers: { "User-Agent": USER_AGENT }, timeout: 45000, ...options })
-      .then(r => { scraperProxyAvailable = true; return r; })
-      .catch((error: unknown) => {
-        if (error instanceof AxiosError && (error.response?.status === 401 || error.response?.status === 403)) {
-          throw error; // Auth failure — surface it, don't fall back
+  if (unblockerKey) {
+    try {
+      const resp = await axios.post(
+        `${WEB_UNBLOCKER_BASE}/request`,
+        { target_url: url, response_format: "html", js_render: false },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${unblockerKey}`,
+          },
+          timeout: 45000,
+          ...options,
         }
-        scraperProxyAvailable = false;
-        return null;
-      });
-
-    const directFetch = fetchWithRetry(url, options);
-
-    // Await both; return proxy result if it succeeded, otherwise direct
-    const [proxyResult, directResult] = await Promise.all([proxyFetch, directFetch]);
-    return (proxyResult ?? directResult) as AxiosResponse;
+      );
+      // Response format: { code: 0, data: { code: 200, html: "..." } }
+      if (resp.data?.code === 0 && resp.data?.data?.html) {
+        return { ...resp, data: resp.data.data.html };
+      }
+      if (resp.data?.code !== 0) {
+        throw new Error(`Web Unblocker error: ${resp.data?.msg ?? "unknown"}`);
+      }
+      return resp;
+    } catch (error) {
+      if (error instanceof AxiosError && (error.response?.status === 401 || error.response?.status === 403)) {
+        throw error; // Auth failure — surface it, don't fall back
+      }
+      // Other errors: fall through to direct fetch
+    }
   }
+
+  // Fallback: direct fetch (no proxy)
   return fetchWithRetry(url, options);
 }
 
